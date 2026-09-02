@@ -1,0 +1,6 @@
+# Profile ativado dentro do container Docker (ver docker-compose.yml).
+# Os valores de conexão são resolvidos a partir das variáveis de ambiente
+# definidas no serviço "app" do docker-compose (DB_HOST=db, etc.).
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:db}:${DB_PORT:5432}/${DB_NAME:biblioteca}

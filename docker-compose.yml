@@ -1,0 +1,56 @@
+# =============================================================================
+# Orquestra a API e o banco de dados PostgreSQL em containers isolados.
+#
+# Uso:
+#   docker compose up --build        # sobe API + banco
+#   docker compose up --build -d     # em background
+#   docker compose down -v           # derruba e remove os volumes (reset total)
+#
+# Escalabilidade: o serviço "app" é stateless (todo o estado vive no
+# Postgres), então pode ser escalado horizontalmente com:
+#   docker compose up --scale app=3
+# bastando colocar um load balancer (ex.: nginx/traefik) na frente das
+# réplicas — ver RELATORIO_TECNICO.md para detalhes.
+# =============================================================================
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: biblioteca-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: biblioteca
+      POSTGRES_USER: biblioteca
+      POSTGRES_PASSWORD: biblioteca
+      TZ: UTC
+    ports:
+      - "5432:5432"
+    volumes:
+      - biblioteca-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U biblioteca -d biblioteca"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: biblioteca-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: biblioteca
+      DB_USER: biblioteca
+      DB_PASSWORD: biblioteca
+      TZ: UTC
+    ports:
+      - "8080:8080"
+
+volumes:
+  biblioteca-db-data:
