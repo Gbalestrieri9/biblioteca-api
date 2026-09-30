@@ -7,7 +7,9 @@
 #   docker compose down -v           # derruba e remove os volumes (reset total)
 #
 # Escalabilidade: o serviço "app" é stateless (todo o estado vive no
-# Postgres), então pode ser escalado horizontalmente com:
+# Postgres; a autenticação também é stateless, via JWT Bearer — nenhuma
+# sessão fica guardada no processo da aplicação), então pode ser escalado
+# horizontalmente com:
 #   docker compose up --scale app=3
 # bastando colocar um load balancer (ex.: nginx/traefik) na frente das
 # réplicas — ver RELATORIO_TECNICO.md para detalhes.
@@ -48,6 +50,10 @@ services:
       DB_NAME: biblioteca
       DB_USER: biblioteca
       DB_PASSWORD: biblioteca
+      # Segredo de assinatura dos tokens JWT — o valor abaixo é só para
+      # desenvolvimento local. Troque-o (e mantenha em segredo) em qualquer
+      # ambiente real; ver README.md.
+      JWT_SECRET: biblioteca-online-chave-secreta-de-desenvolvimento-trocar-em-producao
       TZ: UTC
     ports:
       - "8080:8080"

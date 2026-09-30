@@ -71,6 +71,15 @@ biblioteca:
   emprestimo:
     prazo-dias: 14
   timezone: UTC
+  jwt:
+    # Segredo usado para assinar/validar os tokens JWT (HMAC-SHA256) — o
+    # valor abaixo é só para desenvolvimento local; SEMPRE sobrescreva com
+    # a variável de ambiente JWT_SECRET em qualquer ambiente real (ver
+    # README.md). Precisa ter pelo menos 32 caracteres (256 bits) para
+    # HMAC-SHA256.
+    secret: ${JWT_SECRET:biblioteca-online-chave-secreta-de-desenvolvimento-trocar-em-producao}
+    # Tempo de validade do token, em milissegundos (padrão: 24h).
+    expiracao-ms: ${JWT_EXPIRACAO_MS:86400000}
 
 logging:
   level:

@@ -1,0 +1,1507 @@
+{
+  "info": {
+    "_postman_id": "882c002e-9fab-489a-ac15-ee1ef48ad4e6",
+    "name": "Biblioteca Online API - Tech Challenge Fase 2",
+    "description": "Collection de testes end-to-end da API REST do Sistema de Biblioteca Online (Tech Challenge Fase 2 - Arquitetura e Desenvolvimento Java, Pós Tech), incluindo autenticação JWT Bearer.\n\nRode as pastas em ordem (0 a 5) usando o Postman Runner (botão 'Run' na collection) para exercitar o fluxo completo: login/registro, cadastro de livros e usuários, empréstimo/devolução, reservas e relatórios.\n\nUm script de pre-request no nível da collection injeta automaticamente 'Authorization: Bearer {{accessToken}}' em toda requisição (a pasta 0 preenche essa variável ao logar como o BIBLIOTECARIO de demonstração) — não é necessário copiar/colar tokens manualmente. Todas as demais variáveis (livroId, usuarioId, emprestimoId, etc.) também são preenchidas automaticamente pelos scripts de teste de cada request.\n\nPré-requisito: a API rodando em {{baseUrl}} (padrão: http://localhost:8080, ver docker-compose.yml) com as migrations do Flyway aplicadas (o usuário BIBLIOTECARIO de demonstração é criado por V3__add_autenticacao.sql).\n\nOs e-mails e ISBNs de teste são fixos: rodar a collection uma segunda vez sem resetar o banco ('docker compose down -v && docker compose up --build') fará os cadastros falharem com 409/400 (e-mail ou ISBN já existente).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "0. Autenticação",
+      "item": [
+        {
+          "name": "Login - Bibliotecário (usuário de demonstração)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const jsonData = pm.response.json();",
+                  "pm.test('Retornou um token Bearer', function () {",
+                  "    pm.expect(jsonData.accessToken).to.be.a('string').that.is.not.empty;",
+                  "    pm.expect(jsonData.tipo).to.eql('Bearer');",
+                  "});",
+                  "pm.collectionVariables.set('accessToken', jsonData.accessToken);",
+                  "pm.collectionVariables.set('tokenBibliotecario', jsonData.accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@biblioteca.com\",\n  \"senha\": \"Admin@123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Autentica com o usuário BIBLIOTECARIO criado pela migration V3__add_autenticacao.sql (login/senha de demonstração — troque em qualquer ambiente real). O token vira o padrão ({{accessToken}}) usado por toda a collection, já que a maioria dos endpoints aceita qualquer papel autenticado e os de gestão de acervo/usuários exigem justamente BIBLIOTECARIO."
+          },
+          "response": []
+        },
+        {
+          "name": "Autocadastro - Ana (papel USUARIO)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "const jsonData = pm.response.json();",
+                  "pm.test('Retornou um token Bearer', function () {",
+                  "    pm.expect(jsonData.accessToken).to.be.a('string').that.is.not.empty;",
+                  "});",
+                  "pm.collectionVariables.set('tokenUsuarioAna', jsonData.accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Ana Souza\",\n  \"email\": \"ana.souza@example.com\",\n  \"senha\": \"Senha@123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/registrar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "registrar"
+              ]
+            },
+            "description": "Autocadastro público — sempre cria o usuário com papel USUARIO (ver 'POST /api/v1/usuarios' para criar com papel BIBLIOTECARIO)."
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar Perfil - Ana (/auth/me)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const jsonData = pm.response.json();",
+                  "pm.test('Papel é USUARIO', function () {",
+                  "    pm.expect(jsonData.papel).to.eql('USUARIO');",
+                  "});",
+                  "pm.collectionVariables.set('usuarioIdAna', jsonData.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenUsuarioAna}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "me"
+              ]
+            },
+            "description": "Confirma os dados do usuário a partir do próprio token (sem precisar saber o id de antemão) e captura o id da Ana para uso posterior (empréstimos, reservas)."
+          },
+          "response": []
+        },
+        {
+          "name": "Autocadastro - Bruno (papel USUARIO)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "const jsonData = pm.response.json();",
+                  "pm.collectionVariables.set('tokenUsuarioBruno', jsonData.accessToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Bruno Lima\",\n  \"email\": \"bruno.lima@example.com\",\n  \"senha\": \"Senha@123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/registrar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "registrar"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Consultar Perfil - Bruno (/auth/me)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "const jsonData = pm.response.json();",
+                  "pm.collectionVariables.set('usuarioIdBruno', jsonData.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{tokenUsuarioBruno}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "me"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Login do BIBLIOTECARIO de demonstração e autocadastro de dois usuários comuns (Ana e Bruno); preenche os tokens Bearer usados pelo resto da collection; consulta /auth/me."
+    },
+    {
+      "name": "1. Usuários",
+      "item": [
+        {
+          "name": "Cadastrar Usuário Administrativamente - Carla",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "const jsonData = pm.response.json();",
+                  "pm.test('Usuário criado com papel USUARIO', function () {",
+                  "    pm.expect(jsonData.papel).to.eql('USUARIO');",
+                  "});",
+                  "pm.collectionVariables.set('usuarioIdCarla', jsonData.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Carla Mendes\",\n  \"email\": \"carla.mendes@example.com\",\n  \"senha\": \"Senha@123\",\n  \"papel\": \"USUARIO\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/usuarios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios"
+              ]
+            },
+            "description": "Cadastro administrativo (BIBLIOTECARIO) — diferente do autocadastro ('POST /api/v1/auth/registrar'), aqui quem cadastra escolhe o papel do usuário (também poderia ser BIBLIOTECARIO)."
+          },
+          "response": []
+        },
+        {
+          "name": "Buscar Usuário por ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Usuário possui os campos esperados (sem senha)', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.nome).to.eql('Ana Souza');",
+                  "    pm.expect(jsonData).to.not.have.property('senha');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/usuarios/{{usuarioIdAna}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                "{{usuarioIdAna}}"
+              ]
+            },
+            "description": "Consulta simples aceita qualquer papel autenticado."
+          },
+          "response": []
+        },
+        {
+          "name": "Listar Usuários (filtro por nome)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Encontrou ao menos 1 resultado', function () {",
+                  "    pm.expect(pm.response.json().content.length).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/usuarios?nome=Carla&page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios"
+              ],
+              "query": [
+                {
+                  "key": "nome",
+                  "value": "Carla"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Atualizar Usuário (mantendo a senha atual)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Nome foi atualizado', function () {",
+                  "    pm.expect(pm.response.json().nome).to.eql('Carla Mendes Silva');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Carla Mendes Silva\",\n  \"email\": \"carla.mendes@example.com\",\n  \"papel\": \"USUARIO\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/usuarios/{{usuarioIdCarla}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                "{{usuarioIdCarla}}"
+              ]
+            },
+            "description": "Atualiza nome/e-mail/papel sem informar 'senha' — o campo é opcional na atualização e, em branco/ausente, mantém o hash atual (ver UsuarioMapper.atualizarEntity). Requer BIBLIOTECARIO."
+          },
+          "response": []
+        },
+        {
+          "name": "Excluir Usuário (Carla)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204 No Content ou 409 se houver vínculo', function () {",
+                  "    pm.expect([204, 409]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/usuarios/{{usuarioIdCarla}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                "{{usuarioIdCarla}}"
+              ]
+            },
+            "description": "Atenção: só é possível excluir um usuário sem empréstimos/reservas vinculados no banco (FK). Rode por último."
+          },
+          "response": []
+        }
+      ],
+      "description": "Cadastro administrativo (com senha/papel), busca por id, listagem com filtro e atualização (exigem papel BIBLIOTECARIO)."
+    },
+    {
+      "name": "2. Livros",
+      "item": [
+        {
+          "name": "Cadastrar Livro - Design Patterns",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "const jsonData = pm.response.json();",
+                  "pm.test('Livro criado com os dados enviados', function () {",
+                  "    pm.expect(jsonData.titulo).to.include('Design Patterns');",
+                  "    pm.expect(jsonData.quantidadeDisponivel).to.eql(3);",
+                  "});",
+                  "pm.collectionVariables.set('livroId', jsonData.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Design Patterns: Elements of Reusable Object-Oriented Software\",\n  \"autor\": \"Erich Gamma, Richard Helm, Ralph Johnson, John Vlissides\",\n  \"isbn\": \"9780201633610\",\n  \"quantidadeTotal\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/livros",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "livros"
+              ]
+            },
+            "description": "Cadastro administrativo (requer BIBLIOTECARIO). Este livro é usado no fluxo de empréstimo da pasta 3."
+          },
+          "response": []
+        },
+        {
+          "name": "Cadastrar Livro - The Pragmatic Programmer",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "const jsonData = pm.response.json();",
+                  "pm.collectionVariables.set('livroId2', jsonData.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"The Pragmatic Programmer: Your Journey to Mastery\",\n  \"autor\": \"David Thomas, Andrew Hunt\",\n  \"isbn\": \"9780135957059\",\n  \"quantidadeTotal\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/livros",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "livros"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cadastrar Livros em Lote",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "const jsonData = pm.response.json();",
+                  "pm.test('Retornou 2 livros criados', function () {",
+                  "    pm.expect(jsonData).to.have.lengthOf(2);",
+                  "});",
+                  "pm.collectionVariables.set('livroIdLote1', jsonData[0].id);",
+                  "pm.collectionVariables.set('livroIdLote2', jsonData[1].id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"titulo\": \"Test Driven Development: By Example\",\n    \"autor\": \"Kent Beck\",\n    \"isbn\": \"9780321146533\",\n    \"quantidadeTotal\": 2\n  },\n  {\n    \"titulo\": \"Continuous Delivery\",\n    \"autor\": \"Jez Humble, David Farley\",\n    \"isbn\": \"9780321601919\",\n    \"quantidadeTotal\": 1\n  }\n]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/livros/lote",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "livros",
+                "lote"
+              ]
+            },
+            "description": "Demonstra o cadastro em lote (requisito de 'operações em lote'). Retorna um array com os livros criados."
+          },
+          "response": []
+        },
+        {
+          "name": "Buscar Livro por ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Livro possui os campos esperados', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.titulo).to.include('Design Patterns');",
+                  "    pm.expect(jsonData).to.have.property('disponivel', true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/livros/{{livroId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "livros",
+                "{{livroId}}"
+              ]
+            },
+            "description": "Consulta simples; qualquer papel autenticado pode acessar."
+          },
+          "response": []
+        },
+        {
+          "name": "Listar Livros (filtro por título)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Encontrou ao menos 1 resultado', function () {",
+                  "    pm.expect(pm.response.json().content.length).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/livros?titulo=Pragmatic&page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "livros"
+              ],
+              "query": [
+                {
+                  "key": "titulo",
+                  "value": "Pragmatic"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Busca paginada com filtro por título (case-insensitive, 'contém'). Qualquer papel autenticado pode consultar."
+          },
+          "response": []
+        },
+        {
+          "name": "Listar Livros (paginado, sem filtro)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Resposta contém metadados de paginação', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.all.keys('content', 'pageNumber', 'pageSize', 'totalElements', 'totalPages', 'first', 'last');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/livros?page=0&size=5&sort=titulo&direction=asc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "livros"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "5"
+                },
+                {
+                  "key": "sort",
+                  "value": "titulo"
+                },
+                {
+                  "key": "direction",
+                  "value": "asc"
+                }
+              ]
+            },
+            "description": "Lista o acervo paginado (tamanho de página 5), sem filtros."
+          },
+          "response": []
+        },
+        {
+          "name": "Atualizar Livro",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Título foi atualizado', function () {",
+                  "    pm.expect(pm.response.json().titulo).to.include('20th Anniversary');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"The Pragmatic Programmer (20th Anniversary Edition)\",\n  \"autor\": \"David Thomas, Andrew Hunt\",\n  \"isbn\": \"9780135957059\",\n  \"quantidadeTotal\": 4\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/livros/{{livroId2}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "livros",
+                "{{livroId2}}"
+              ]
+            },
+            "description": "Atualiza o título e a quantidade total do livro cadastrado (BIBLIOTECARIO)."
+          },
+          "response": []
+        },
+        {
+          "name": "Excluir Livro (The Pragmatic Programmer)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204 No Content', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/livros/{{livroId2}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "livros",
+                "{{livroId2}}"
+              ]
+            },
+            "description": "Nunca foi emprestado, então pode ser removido com segurança."
+          },
+          "response": []
+        }
+      ],
+      "description": "Cadastro (individual e em lote), busca por id, busca paginada com filtro e atualização (cadastro/edição exigem papel BIBLIOTECARIO)."
+    },
+    {
+      "name": "3. Empréstimos",
+      "item": [
+        {
+          "name": "Emprestar Livro - Ana pega Design Patterns",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "const jsonData = pm.response.json();",
+                  "pm.test('Empréstimo criado com status ATIVO e prazo calculado', function () {",
+                  "    pm.expect(jsonData.status).to.eql('ATIVO');",
+                  "    pm.expect(jsonData.dataPrevistaDevolucao).to.be.a('string').that.is.not.empty;",
+                  "});",
+                  "pm.collectionVariables.set('emprestimoId', jsonData.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"livroId\": \"{{livroId}}\",\n  \"usuarioId\": \"{{usuarioIdAna}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emprestimos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emprestimos"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Buscar Empréstimo por ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emprestimos/{{emprestimoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emprestimos",
+                "{{emprestimoId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Listar Empréstimos (filtro por status ATIVO)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Encontrou ao menos 1 resultado', function () {",
+                  "    pm.expect(pm.response.json().content.length).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emprestimos?status=ATIVO&page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emprestimos"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "ATIVO"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Devolver Empréstimo",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Status virou DEVOLVIDO', function () {",
+                  "    pm.expect(pm.response.json().status).to.eql('DEVOLVIDO');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emprestimos/{{emprestimoId}}/devolucao",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emprestimos",
+                "{{emprestimoId}}",
+                "devolucao"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Empréstimo, consulta, listagem por status e devolução."
+    },
+    {
+      "name": "4. Reservas",
+      "item": [
+        {
+          "name": "Cadastrar Livro com Exemplar Único - Working Effectively with Legacy Code",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "const jsonData = pm.response.json();",
+                  "pm.collectionVariables.set('livroUnicoId', jsonData.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titulo\": \"Working Effectively with Legacy Code\",\n  \"autor\": \"Michael Feathers\",\n  \"isbn\": \"9780131177055\",\n  \"quantidadeTotal\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/livros",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "livros"
+              ]
+            },
+            "description": "Só 1 exemplar — depois de emprestado, fica indisponível, montando o cenário para a reserva."
+          },
+          "response": []
+        },
+        {
+          "name": "Emprestar o Exemplar Único para o Bruno",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "pm.collectionVariables.set('emprestimoUnicoId', pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"livroId\": \"{{livroUnicoId}}\",\n  \"usuarioId\": \"{{usuarioIdBruno}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emprestimos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emprestimos"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reservar o Livro Indisponível para a Ana",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "const jsonData = pm.response.json();",
+                  "pm.test('Reserva criada com status ATIVA', function () {",
+                  "    pm.expect(jsonData.status).to.eql('ATIVA');",
+                  "});",
+                  "pm.collectionVariables.set('reservaId', jsonData.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"livroId\": \"{{livroUnicoId}}\",\n  \"usuarioId\": \"{{usuarioIdAna}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reservas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reservas"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Listar Reservas (filtro por usuário)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Encontrou a reserva criada', function () {",
+                  "    pm.expect(pm.response.json().content.length).to.be.above(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reservas?usuarioId={{usuarioIdAna}}&page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reservas"
+              ],
+              "query": [
+                {
+                  "key": "usuarioId",
+                  "value": "{{usuarioIdAna}}"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Devolver o Exemplar Único (libera o livro)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/emprestimos/{{emprestimoUnicoId}}/devolucao",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "emprestimos",
+                "{{emprestimoUnicoId}}",
+                "devolucao"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cancelar a Reserva",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Status virou CANCELADA', function () {",
+                  "    pm.expect(pm.response.json().status).to.eql('CANCELADA');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/reservas/{{reservaId}}/cancelamento",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reservas",
+                "{{reservaId}}",
+                "cancelamento"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Fluxo completo: livro com exemplar único fica indisponível após o empréstimo → reserva é criada → devolução libera o livro → cancelamento de reserva."
+    },
+    {
+      "name": "5. Relatórios",
+      "item": [
+        {
+          "name": "Top 20 Livros Mais Emprestados",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Retornou uma lista', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/relatorios/livros-mais-emprestados",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "relatorios",
+                "livros-mais-emprestados"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Empréstimos Ativos com Previsão de Devolução",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Resposta é paginada', function () {",
+                  "    pm.expect(pm.response.json()).to.have.property('content');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/relatorios/emprestimos-ativos?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "relatorios",
+                "emprestimos-ativos"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Top 20 livros mais emprestados e empréstimos ativos com previsão de devolução."
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Injeta automaticamente 'Authorization: Bearer {{accessToken}}' em",
+          "// toda requisição, exceto nas rotas públicas de autenticação e nas",
+          "// requisições que já definem seu próprio cabeçalho Authorization",
+          "// (usadas para consultar /auth/me com o token da Ana ou do Bruno).",
+          "const rotasPublicas = ['/api/v1/auth/login', '/api/v1/auth/registrar'];",
+          "const url = pm.request.url.toString();",
+          "const ehRotaPublica = rotasPublicas.some((rota) => url.includes(rota));",
+          "const jaTemAuthorization = pm.request.headers.has('Authorization');",
+          "",
+          "if (!ehRotaPublica && !jaTemAuthorization) {",
+          "    pm.request.headers.upsert({",
+          "        key: 'Authorization',",
+          "        value: 'Bearer ' + pm.collectionVariables.get('accessToken')",
+          "    });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "tokenBibliotecario",
+      "value": ""
+    },
+    {
+      "key": "tokenUsuarioAna",
+      "value": ""
+    },
+    {
+      "key": "tokenUsuarioBruno",
+      "value": ""
+    },
+    {
+      "key": "usuarioIdAna",
+      "value": ""
+    },
+    {
+      "key": "usuarioIdBruno",
+      "value": ""
+    },
+    {
+      "key": "usuarioIdCarla",
+      "value": ""
+    },
+    {
+      "key": "livroId",
+      "value": ""
+    },
+    {
+      "key": "livroId2",
+      "value": ""
+    },
+    {
+      "key": "livroIdLote1",
+      "value": ""
+    },
+    {
+      "key": "livroIdLote2",
+      "value": ""
+    },
+    {
+      "key": "livroUnicoId",
+      "value": ""
+    },
+    {
+      "key": "emprestimoId",
+      "value": ""
+    },
+    {
+      "key": "emprestimoUnicoId",
+      "value": ""
+    },
+    {
+      "key": "reservaId",
+      "value": ""
+    }
+  ]
+}

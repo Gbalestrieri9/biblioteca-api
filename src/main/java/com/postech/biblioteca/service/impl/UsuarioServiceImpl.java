@@ -15,6 +15,7 @@ import com.postech.biblioteca.service.UsuarioService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,11 +26,15 @@ public class UsuarioServiceImpl implements UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
     private final EmprestimoRepository emprestimoRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     public UsuarioResponseDTO cadastrar(UsuarioRequestDTO dto) {
         validarEmailUnico(dto.email(), null);
-        Usuario salvo = usuarioRepository.save(UsuarioMapper.toEntity(dto));
+        if (dto.senha() == null || dto.senha().isBlank()) {
+            throw new BusinessException("A senha é obrigatória ao cadastrar um usuário");
+        }
+        Usuario salvo = usuarioRepository.save(UsuarioMapper.toEntity(dto, passwordEncoder.encode(dto.senha())));
         return UsuarioMapper.toResponseDTO(salvo);
     }
 
@@ -50,7 +55,13 @@ public class UsuarioServiceImpl implements UsuarioService {
     public UsuarioResponseDTO atualizar(Long id, UsuarioRequestDTO dto) {
         Usuario usuario = buscarEntidadePorId(id);
         validarEmailUnico(dto.email(), id);
-        UsuarioMapper.atualizarEntity(usuario, dto);
+        // Senha em branco na atualização = mantém a senha atual (não força o
+        // BIBLIOTECARIO a redigitar/resetar a senha só para editar
+        // nome/e-mail/papel) — ver UsuarioMapper.atualizarEntity.
+        String senhaCodificada = (dto.senha() == null || dto.senha().isBlank())
+                ? null
+                : passwordEncoder.encode(dto.senha());
+        UsuarioMapper.atualizarEntity(usuario, dto, senhaCodificada);
         return UsuarioMapper.toResponseDTO(usuarioRepository.save(usuario));
     }
 
